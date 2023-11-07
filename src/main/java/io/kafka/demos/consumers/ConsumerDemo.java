@@ -1,67 +1,60 @@
-package io.kafka.demos.producers;
+package io.kafka.demos.consumers;
 
-
-import org.apache.kafka.clients.producer.*;
-import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+import java.util.List;
 import java.util.Properties;
 
-public class ProducerDemoWithKeys {
-    private static final Logger log = LoggerFactory.getLogger(ProducerDemoWithKeys.class.getSimpleName());
+public class ConsumerDemo {
+    private static final Logger log = LoggerFactory.getLogger(ConsumerDemo.class.getSimpleName());
     public static void main(String[] args) {
-        log.info("I am a kafka ProducerDemoWithKeys!");
+        log.info("I am a kafka ConsumerDemo!");
 
-        // create the producer
-        KafkaProducer<String, String> producer = new KafkaProducer<>(getPropertiesKafka());
+        // create the consumer
+        KafkaConsumer<String, String> consumer = new KafkaConsumer<>(getPropertiesKafka());
 
-        for (int j = 0; j < 10; j++) {
-            for (int i = 0; i < 10; i++) {
+        String topic = "topic_demo_java";
 
-                String topic = "topic_demo_java";
-                String key = "id_" + i;
-                String value = "Hello topic_demo_java " + i;
+        //subscribe to a topic
+        consumer.subscribe(List.of(topic));
 
-                //create a Producer record
-                ProducerRecord<String, String> producerRecord = new ProducerRecord<>(topic, key, value);
+        //poll for data
+        while(true){
+            log.info("Polling");
 
-                // send data
-                producer.send(producerRecord, (recordMetadata, e) -> {
-                    //executes every time a record successfully send or an exception is thrown
-                    if (e == null) {
-                        //the record was successfully sent
-                        log.info("Key: " + key + " -> " + "Value: " + value + " | " +
-                                "Partition: " + recordMetadata.partition());
-                    } else {
-                        log.error("Error while producing ", e);
-                    }
-                });
-            }
+           //returns list of records
+           ConsumerRecords<String, String> recordsList = consumer.poll(Duration.ofMillis(1000));
 
-            log.info("=====================================================");
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+           for (ConsumerRecord<String, String> record : recordsList){
+                log.info("Key: " + record.key() +
+                        " | Value: " + record.value() +
+                        " | Partition: " + record.partition() +
+                        " | Offset: " + record.offset());
+           }
         }
-        //tell the producer to send all data and block until done --synchronous
-        producer.flush();
-
-        //flush and close the producer
-        producer.close();
     }
 
-    private static Properties getPropertiesKafka(){
+    private static Properties getPropertiesKafka() {
         Properties properties = new Properties();
+        String groupId = "my_java_application";
 
         // connect to localhost
         properties.setProperty("bootstrap.servers", "127.0.0.1:9092");
 
         //set producer properties
-        properties.setProperty("key.serializer", StringSerializer.class.getName());
-        properties.setProperty("value.serializer", StringSerializer.class.getName());
+        properties.setProperty("key.deserializer", StringDeserializer.class.getName());
+        properties.setProperty("value.deserializer", StringDeserializer.class.getName());
+
+        properties.setProperty("group.id", groupId);
+
+        //consumer starts reading messages from the beginning of the topic
+        properties.setProperty("auto.offset.reset","earliest");
 
         return properties;
     }
